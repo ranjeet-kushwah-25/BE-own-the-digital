@@ -5,7 +5,6 @@ const {
   submitContact,
   getContacts,
   getContact,
-  updateContact,
   deleteContact,
   getContactStats,
 } = require('../controllers/contactController');
@@ -22,7 +21,6 @@ const { handleValidationErrors } = require('../middleware/validation');
  *       required:
  *         - name
  *         - email
- *         - subject
  *         - message
  *       properties:
  *         _id:
@@ -31,33 +29,16 @@ const { handleValidationErrors } = require('../middleware/validation');
  *         name:
  *           type: string
  *           description: Contact person's name
+ *           example: John Doe
  *         email:
  *           type: string
  *           format: email
  *           description: Contact person's email
- *         subject:
- *           type: string
- *           description: Message subject
+ *           example: john@example.com
  *         message:
  *           type: string
  *           description: Message content
- *         phone:
- *           type: string
- *           description: Contact phone number
- *         company:
- *           type: string
- *           description: Contact person's company
- *         status:
- *           type: string
- *           enum: [pending, in-progress, completed]
- *           description: Contact submission status
- *         emailSent:
- *           type: boolean
- *           description: Whether email notification was sent
- *         priority:
- *           type: string
- *           enum: [low, medium, high]
- *           description: Contact priority level
+ *           example: I would like to discuss a project with you...
  *         createdAt:
  *           type: string
  *           format: date-time
@@ -83,32 +64,21 @@ const { handleValidationErrors } = require('../middleware/validation');
  *             required:
  *               - name
  *               - email
- *               - subject
  *               - message
  *             properties:
  *               name:
  *                 type: string
+ *                 description: Contact person's name
  *                 example: John Doe
  *               email:
  *                 type: string
  *                 format: email
+ *                 description: Contact person's email
  *                 example: john@example.com
- *               subject:
- *                 type: string
- *                 example: Project Inquiry
  *               message:
  *                 type: string
+ *                 description: Message content
  *                 example: I would like to discuss a project with you...
- *               phone:
- *                 type: string
- *                 example: +1234567890
- *               company:
- *                 type: string
- *                 example: Acme Corp
- *               priority:
- *                 type: string
- *                 enum: [low, medium, high]
- *                 example: medium
  *     responses:
  *       201:
  *         description: Contact form submitted successfully
@@ -153,22 +123,10 @@ router.post('/', contactValidation, handleValidationErrors, submitContact);
  *           default: 10
  *         description: Number of contacts per page
  *       - in: query
- *         name: status
- *         schema:
- *           type: string
- *           enum: [pending, in-progress, completed]
- *         description: Filter by status
- *       - in: query
- *         name: priority
- *         schema:
- *           type: string
- *           enum: [low, medium, high]
- *         description: Filter by priority
- *       - in: query
  *         name: search
  *         schema:
  *           type: string
- *         description: Search in name, email, and subject
+ *         description: Search in name, email, and message
  *       - in: query
  *         name: sort
  *         schema:
@@ -253,47 +211,6 @@ router.get('/', authenticate, authorize('admin'), getContacts);
  */
 router.get('/:id', authenticate, authorize('admin'), getContact);
 
-/**
- * @swagger
- * /api/contact/{id}:
- *   put:
- *     summary: Update contact submission status (admin only)
- *     tags: [Contact]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: Contact submission ID
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               status:
- *                 type: string
- *                 enum: [pending, in-progress, completed]
- *                 example: in-progress
- *               priority:
- *                 type: string
- *                 enum: [low, medium, high]
- *                 example: high
- *     responses:
- *       200:
- *         description: Contact submission updated successfully
- *       401:
- *         description: Unauthorized
- *       403:
- *         description: Admin access required
- *       404:
- *         description: Contact submission not found
- */
-router.put('/:id', authenticate, authorize('admin'), updateContact);
 
 /**
  * @swagger
@@ -343,38 +260,15 @@ router.delete('/:id', authenticate, authorize('admin'), deleteContact);
  *                 data:
  *                   type: object
  *                   properties:
- *                     status:
- *                       type: object
- *                       properties:
- *                         pending:
- *                           type: integer
- *                         in-progress:
- *                           type: integer
- *                         completed:
- *                           type: integer
- *                     priority:
- *                       type: object
- *                       properties:
- *                         high:
- *                           type: integer
- *                         medium:
- *                           type: integer
- *                         low:
- *                           type: integer
- *                     email:
- *                       type: object
- *                       properties:
- *                         sent:
- *                           type: integer
- *                         notSent:
- *                           type: integer
  *                     recent:
  *                       type: object
  *                       properties:
  *                         last30Days:
  *                           type: integer
+ *                           description: Number of submissions in last 30 days
  *                     total:
  *                       type: integer
+ *                       description: Total number of contact submissions
  *       401:
  *         description: Unauthorized
  *       403:

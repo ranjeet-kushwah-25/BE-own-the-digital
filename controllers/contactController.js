@@ -6,10 +6,12 @@ const { sendContactEmail, sendAutoReplyEmail } = require('../utils/email');
 // @access  Public
 const submitContact = async (req, res, next) => {
   try {
+    const { name, email, message } = req.body;
+
     const contactData = {
-      ...req.body,
-      status: 'pending',
-      emailSent: false
+      name,
+      email,
+      message
     };
 
     const contact = await Contact.create(contactData);
@@ -18,19 +20,12 @@ const submitContact = async (req, res, next) => {
     const emailSent = await sendContactEmail(contact);
     const autoReplySent = await sendAutoReplyEmail(contact);
 
-    // Update contact record with email status
-    await Contact.findByIdAndUpdate(contact._id, {
-      emailSent: emailSent && autoReplySent
-    });
 
     res.status(201).json({
       success: true,
       message: 'Contact form submitted successfully. We will get back to you soon!',
       data: {
-        contact: {
-          ...contact.toObject(),
-          emailSent: emailSent && autoReplySent
-        }
+        contact
       }
     });
   } catch (error) {
@@ -49,17 +44,11 @@ const getContacts = async (req, res, next) => {
 
     // Build filter
     const filter = {};
-    if (req.query.status) {
-      filter.status = req.query.status;
-    }
-    if (req.query.priority) {
-      filter.priority = req.query.priority;
-    }
     if (req.query.search) {
       filter.$or = [
         { name: { $regex: req.query.search, $options: 'i' } },
         { email: { $regex: req.query.search, $options: 'i' } },
-        { subject: { $regex: req.query.search, $options: 'i' } }
+        { message: { $regex: req.query.search, $options: 'i' } }
       ];
     }
 
@@ -126,44 +115,6 @@ const getContact = async (req, res, next) => {
   }
 };
 
-// @desc    Update contact submission status
-// @route   PUT /api/contact/:id
-// @access  Private (admin only)
-const updateContact = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const { status, priority } = req.body;
-
-    const contact = await Contact.findById(id);
-
-    if (!contact) {
-      return res.status(404).json({
-        success: false,
-        message: 'Contact submission not found'
-      });
-    }
-
-    const updateData = {};
-    if (status) updateData.status = status;
-    if (priority) updateData.priority = priority;
-
-    const updatedContact = await Contact.findByIdAndUpdate(
-      id,
-      updateData,
-      { new: true, runValidators: true }
-    );
-
-    res.status(200).json({
-      success: true,
-      message: 'Contact submission updated successfully',
-      data: {
-        contact: updatedContact
-      }
-    });
-  } catch (error) {
-    next(error);
-  }
-};
 
 // @desc    Delete contact submission
 // @route   DELETE /api/contact/:id
@@ -197,48 +148,26 @@ const deleteContact = async (req, res, next) => {
 // @access  Private (admin only)
 const getContactStats = async (req, res, next) => {
   try {
-    const stats = await Promise.all([
-      Contact.countDocuments({ status: 'pending' }),
-      Contact.countDocuments({ status: 'in-progress' }),
-      Contact.countDocuments({ status: 'completed' }),
-      Contact.countDocuments({ priority: 'high' }),
-      Contact.countDocuments({ priority: 'medium' }),
-      Contact.countDocuments({ priority: 'low' }),
-      Contact.countDocuments({ emailSent: true }),
-      Contact.countDocuments({ emailSent: false })
-    ]);
-
-    const [pending, inProgress, completed, highPriority, mediumPriority, lowPriority, emailSent, emailNotSent] = stats;
-
     // Get last 30 days submissions
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    
-    const recentSubmissions = await Contact.countDocuments({
-      createdAt: { $gte: thirtyDaysAgo }
-    });
+
+    const stats = await Promise.all([
+      Contact.countDocuments(),
+      Contact.countDocuments({
+        createdAt: { $gte: thirtyDaysAgo }
+      })
+    ]);
+
+    const [total, recentSubmissions] = stats;
 
     res.status(200).json({
       success: true,
       data: {
-        status: {
-          pending,
-          inProgress,
-          completed
-        },
-        priority: {
-          high: highPriority,
-          medium: mediumPriority,
-          low: lowPriority
-        },
-        email: {
-          sent: emailSent,
-          notSent: emailNotSent
-        },
         recent: {
           last30Days: recentSubmissions
         },
-        total: pending + inProgress + completed
+        total
       }
     });
   } catch (error) {
@@ -250,7 +179,6 @@ module.exports = {
   submitContact,
   getContacts,
   getContact,
-  updateContact,
   deleteContact,
   getContactStats,
 };
