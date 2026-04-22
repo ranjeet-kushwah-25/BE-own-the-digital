@@ -11,6 +11,19 @@ const createBlog = async (req, res, next) => {
       author: req.user.id
     };
 
+    // Auto-generate section numbers if not provided
+    if (blogData.sections && Array.isArray(blogData.sections)) {
+      blogData.sections = blogData.sections.map((section, index) => ({
+        ...section,
+        section_number: section.section_number || (index + 1)
+      }));
+    }
+
+    // Set excerpt from introduction if not provided
+    if (!blogData.excerpt && blogData.introduction) {
+      blogData.excerpt = blogData.introduction.substring(0, 300) + '...';
+    }
+
     const blog = await Blog.create(blogData);
 
     // Populate author details
@@ -67,11 +80,21 @@ const getBlogs = async (req, res, next) => {
       sort.createdAt = -1; // Default sort by newest first
     }
 
-    const blogs = await Blog.find(filter)
+    // Determine if we need full blog details or just listing info
+    const isListing = req.query.listing !== 'false';
+
+    let query = Blog.find(filter)
       .populate('author', 'name email')
       .sort(sort)
       .skip(skip)
       .limit(limit);
+
+    if (isListing) {
+      // For listing pages, select only essential fields
+      query = query.select('title slug category heroImage thumbnailImage readTime readTimeText excerpt formattedDate createdAt');
+    }
+
+    const blogs = await query;
 
     const total = await Blog.countDocuments(filter);
 
@@ -158,9 +181,18 @@ const updateBlog = async (req, res, next) => {
       });
     }
 
+    // Auto-generate section numbers if sections are being updated
+    const updateData = { ...req.body };
+    if (updateData.sections && Array.isArray(updateData.sections)) {
+      updateData.sections = updateData.sections.map((section, index) => ({
+        ...section,
+        section_number: section.section_number || (index + 1)
+      }));
+    }
+
     const updatedBlog = await Blog.findByIdAndUpdate(
       id,
-      req.body,
+      updateData,
       { new: true, runValidators: true }
     ).populate('author', 'name email');
 
@@ -314,6 +346,197 @@ const getCategories = async (req, res, next) => {
   }
 };
 
+// @desc    Get related blogs for a specific blog
+// @route   GET /api/blogs/:id/related
+// @access  Public
+const getRelatedBlogs = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    let blog;
+
+    // Try to find by ID first, then by slug
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      blog = await Blog.findById(id);
+    }
+
+    if (!blog) {
+      blog = await Blog.findOne({ slug: id });
+    }
+
+    if (!blog) {
+      return res.status(404).json({
+        success: false,
+        message: 'Blog post not found'
+      });
+    }
+
+    // Find related blogs based on category and tags, excluding current blog
+    const relatedBlogs = await Blog.find({
+      _id: { $ne: blog._id },
+      status: 'published',
+      $or: [
+        { category: blog.category },
+        { tags: { $in: blog.tags } }
+      ]
+    })
+      .populate('author', 'name email')
+      .select('title slug category heroImage thumbnailImage readTime readTimeText excerpt formattedDate createdAt')
+      .limit(6)
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        relatedBlogs
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get featured blogs for homepage
+// @route   GET /api/blogs/featured
+// @access  Public
+const getFeaturedBlogs = async (req, res, next) => {
+  try {
+    const limit = parseInt(req.query.limit) || 3;
+
+    const featuredBlogs = await Blog.find({ status: 'published' })
+      .populate('author', 'name email')
+      .select('title slug category heroImage thumbnailImage readTime readTimeText excerpt formattedDate createdAt')
+      .sort({ views: -1, likes: -1, createdAt: -1 })
+      .limit(limit);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        featuredBlogs
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get blogs by category with pagination
+// @route   GET /api/blogs/category/:category
+// @access  Public
+const getBlogsByCategory = async (req, res, next) => {
+  try {
+    const { category } = req.params;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    const blogs = await Blog.find({
+      category: category.toLowerCase(),
+      status: 'published'
+    })
+      .populate('author', 'name email')
+      .select('title slug category heroImage thumbnailImage readTime readTimeText excerpt formattedDate createdAt')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
+
+    const total = await Blog.countDocuments({
+      category: category.toLowerCase(),
+      status: 'published'
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        blogs,
+        pagination: {
+          page,
+          limit,
+          total,
+          pages: Math.ceil(total / limit),
+          hasNext: page < Math.ceil(total / limit),
+          hasPrev: page > 1
+        },
+        category
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get all blogs by specific category (with optional pagination)
+// @route   GET /api/blogs/category/:category/all
+// @access  Public
+const getAllBlogsByCategory = async (req, res, next) => {
+  try {
+    const { category } = req.params;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 50; // Default higher limit for "all" endpoint
+    const skip = (page - 1) * limit;
+
+    // Check if pagination is disabled (limit = -1)
+    const usePagination = req.query.limit !== '-1';
+
+    let blogs;
+    let total;
+
+    if (usePagination) {
+      // With pagination
+      blogs = await Blog.find({
+        category: category.toLowerCase(),
+        status: 'published'
+      })
+        .populate('author', 'name email')
+        .select('title slug category heroImage thumbnailImage readTime readTimeText excerpt formattedDate createdAt')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit);
+
+      total = await Blog.countDocuments({
+        category: category.toLowerCase(),
+        status: 'published'
+      });
+    } else {
+      // Without pagination - get all blogs
+      blogs = await Blog.find({
+        category: category.toLowerCase(),
+        status: 'published'
+      })
+        .populate('author', 'name email')
+        .select('title slug category heroImage thumbnailImage readTime readTimeText excerpt formattedDate createdAt')
+        .sort({ createdAt: -1 });
+
+      total = blogs.length;
+    }
+
+    const response = {
+      success: true,
+      data: {
+        blogs,
+        category: category.toLowerCase(),
+        total
+      }
+    };
+
+    // Add pagination info only if pagination is used
+    if (usePagination) {
+      response.data.pagination = {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+        hasNext: page < Math.ceil(total / limit),
+        hasPrev: page > 1
+      };
+    }
+
+    res.status(200).json(response);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   createBlog,
   getBlogs,
@@ -323,4 +546,8 @@ module.exports = {
   toggleLike,
   addComment,
   getCategories,
+  getRelatedBlogs,
+  getFeaturedBlogs,
+  getBlogsByCategory,
+  getAllBlogsByCategory,
 };
