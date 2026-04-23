@@ -17,7 +17,7 @@ const submitContact = async (req, res, next) => {
     const contact = await Contact.create(contactData);
 
     // Send email notification
-    const emailSent = await sendContactEmail(contact);
+    const emailSent = await sendContactEmail(contact, email);
     const autoReplySent = await sendAutoReplyEmail(contact);
 
 

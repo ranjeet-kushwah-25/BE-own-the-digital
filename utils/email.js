@@ -3,7 +3,8 @@ const nodemailer = require('nodemailer');
 const createTransporter = () => {
   return nodemailer.createTransport({
     host: process.env.EMAIL_HOST,
-    port: process.env.EMAIL_PORT,
+    service: process.env.EMAIL_HOST,
+    // port: process.env.EMAIL_PORT,
     secure: false,
     auth: {
       user: process.env.EMAIL_USER,
@@ -12,12 +13,12 @@ const createTransporter = () => {
   });
 };
 
-const sendContactEmail = async (contactData) => {
+const sendContactEmail = async (contactData, receiver) => {
   const transporter = createTransporter();
 
   const mailOptions = {
-    from: process.env.EMAIL_FROM,
-    to: process.env.CONTACT_EMAIL,
+    from: process.env.EMAIL_USER,
+    to: receiver,
     subject: `New Contact Form Submission from ${contactData.name}`,
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
