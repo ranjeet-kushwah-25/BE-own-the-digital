@@ -33,14 +33,16 @@ const register = async (req, res, next) => {
     // Add refresh token to user
     await user.addRefreshToken(refreshToken);
 
-    // Remove password from output
-    user.password = undefined;
+    // Convert to plain object and remove sensitive fields
+    const userObject = user.toObject();
+    delete userObject.password;
+    delete userObject.refreshTokens;
 
     res.status(201).json({
       success: true,
       message: 'User registered successfully',
       data: {
-        user,
+        user: userObject,
         token,
         refreshToken
       }
@@ -82,14 +84,16 @@ const login = async (req, res, next) => {
     // Add refresh token to user
     await user.addRefreshToken(refreshToken);
 
-    // Remove password from output
-    user.password = undefined;
+    // Convert to plain object and remove sensitive fields
+    const userObject = user.toObject();
+    delete userObject.password;
+    delete userObject.refreshTokens;
 
     res.status(200).json({
       success: true,
       message: 'Login successful',
       data: {
-        user,
+        user: userObject,
         token,
         refreshToken
       }
@@ -105,11 +109,16 @@ const login = async (req, res, next) => {
 const getProfile = async (req, res, next) => {
   try {
     const user = await User.findById(req.user.id);
+    
+    // Convert to plain object and remove sensitive fields
+    const userObject = user.toObject();
+    delete userObject.password;
+    delete userObject.refreshTokens;
 
     res.status(200).json({
       success: true,
       data: {
-        user
+        user: userObject
       }
     });
   } catch (error) {
@@ -144,11 +153,16 @@ const updateProfile = async (req, res, next) => {
       { new: true, runValidators: true }
     );
 
+    // Convert to plain object and remove sensitive fields
+    const userObject = user.toObject();
+    delete userObject.password;
+    delete userObject.refreshTokens;
+
     res.status(200).json({
       success: true,
       message: 'Profile updated successfully',
       data: {
-        user
+        user: userObject
       }
     });
   } catch (error) {
