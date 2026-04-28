@@ -2,11 +2,17 @@ const mongoose = require('mongoose');
 
 const connectDB = async () => {
   try {
-    console.log("Connecting to:>>>", process.env.MONGODB_URI);
-    const conn = await mongoose.connect('mongodb://localhost:27017/own-the-digital');
-    // const conn = await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/own-the-digital');
+    const mongoUri = process.env.MONGODB_URI;
+    // Try MongoDB Atlas first, fallback to localhost if it fails
+    let conn;
+    try {
+      conn = await mongoose.connect(mongoUri);
+    
+    } catch (atlasError) {
+      console.warn('MongoDB Atlas connection failed, trying localhost:', atlasError.message);
+      conn = await mongoose.connect('mongodb://localhost:27017/own-the-digital');
 
-    console.log(`MongoDB Connected: ${conn.connection.host}`);
+    }
   } catch (error) {
     console.error('Database connection error:', error);
     process.exit(1);

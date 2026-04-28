@@ -16,7 +16,12 @@ const blogRoutes = require('./routes/blog');
 const contactRoutes = require('./routes/contact');
 
 // Connect to database
-connectDB();
+connectDB().then(() => {
+  console.log('Database connected successfully');
+}).catch((err) => {
+  console.error('Database connection failed:', err);
+  process.exit(1);
+});
 
 const app = express();
 
