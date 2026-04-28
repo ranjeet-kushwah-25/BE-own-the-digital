@@ -32,7 +32,7 @@ app.use(helmet());
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
     ? ['https://be-own-the-digital.onrender.com/api-docs'] // Add your frontend domain here
-    : ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:5173'],
+    : ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:5173','https://be-own-the-digital.onrender.com/api-docs'],
   credentials: true
 }));
 
