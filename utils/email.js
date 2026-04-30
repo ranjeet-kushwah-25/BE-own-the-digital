@@ -10,6 +10,12 @@ const createTransporter = () => {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS,
     },
+    // Force IPv4 to avoid IPv6 connectivity issues
+    family: 4,
+    // Add connection timeout
+    connectionTimeout: 60000,
+    greetingTimeout: 30000,
+    socketTimeout: 60000,
   });
 };
 
@@ -64,7 +70,7 @@ const sendAutoReplyEmail = async (contactData) => {
   const transporter = createTransporter();
 
   const mailOptions = {
-    from: process.env.EMAIL_FROM,
+    from: process.env.EMAIL_USER,
     to: contactData.email,
     subject: 'Thank you for contacting Own The Digital',
     html: `
