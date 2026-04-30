@@ -6,6 +6,7 @@ const { sendContactEmail, sendAutoReplyEmail } = require('../utils/email');
 // @access  Public
 const submitContact = async (req, res, next) => {
   try {
+
     const { name, email, message } = req.body;
 
     const contactData = {
@@ -16,16 +17,35 @@ const submitContact = async (req, res, next) => {
 
     const contact = await Contact.create(contactData);
 
-    // Send email notification
-    const emailSent = await sendContactEmail(contact, email);
-    const autoReplySent = await sendAutoReplyEmail(contact);
+    // Send email notification with proper error handling
+    let emailSent = false;
+    let autoReplySent = false;
 
+    try {
+      emailSent = await sendContactEmail(contact, email);
+    } catch (error) {
+      console.error('Contact email failed:', error);
+    }
+
+    try {
+      autoReplySent = await sendAutoReplyEmail(contact);
+    } catch (error) {
+      console.error('Auto-reply email failed:', error);
+    }
+
+    const responseMessage = emailSent && autoReplySent
+      ? 'Contact form submitted successfully. We will get back to you soon!'
+      : 'Contact form submitted successfully. We will get back to you soon! (Email notifications may be delayed)';
 
     res.status(201).json({
       success: true,
-      message: 'Contact form submitted successfully. We will get back to you soon!',
+      message: responseMessage,
       data: {
-        contact
+        contact,
+        emailStatus: {
+          notificationSent: emailSent,
+          autoReplySent: autoReplySent
+        }
       }
     });
   } catch (error) {
@@ -123,7 +143,7 @@ const deleteContact = async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    const contact = await Contact.findById(id);
+    const contact = await Contact.findByIdAndDelete(id);
 
     if (!contact) {
       return res.status(404).json({
@@ -131,8 +151,6 @@ const deleteContact = async (req, res, next) => {
         message: 'Contact submission not found'
       });
     }
-
-    await Contact.findByIdAndDelete(id);
 
     res.status(200).json({
       success: true,
